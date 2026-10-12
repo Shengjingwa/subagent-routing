@@ -1,0 +1,42 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: install.ps1 (PowerShell 7)
+        run: pwsh -NoProfile -File tests/test-install.ps1
+      - name: install.ps1 (Windows PowerShell 5.1)
+        run: pwsh -NoProfile -File tests/test-install.ps1 -Shell powershell
+      - name: install.sh (Git Bash)
+        shell: bash
+        run: bash tests/test-install.sh
+
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: install.sh is executable
+        run: ./install.sh --help
+      - name: install.sh
+        run: bash tests/test-install.sh
+      - name: install.sh (macOS system bash 3.2)
+        if: runner.os == 'macOS'
+        run: /bin/bash tests/test-install.sh
+      - name: install.ps1
+        run: pwsh -NoProfile -File tests/test-install.ps1
+      - name: shellcheck
+        if: matrix.os == 'ubuntu-latest'
+        run: shellcheck install.sh tests/test-install.sh
