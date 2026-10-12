@@ -12,7 +12,9 @@
 #             in the Codex home directory ($CODEX_HOME or ~/.codex).
 # Run it again to change tiers; it replaces only its own block. --uninstall removes
 # the blocks (for Codex, from both AGENTS.md and AGENTS.override.md). A backup of each
-# changed file is kept as <file>.subagent-routing.bak.
+# changed file is kept as <file>.subagent-routing.bak. Text outside the block keeps its
+# bytes, line endings (also a mix of CRLF and LF) and BOM. If the file did not end with
+# a newline, install adds one and says so in the begin marker; uninstall removes it.
 #
 # Example:
 #   ./install.sh --claude --light haiku --standard sonnet --strong opus
@@ -241,19 +243,33 @@ has_block() {
 }
 
 cat >"$WORK/edit.awk" <<'AWK'
-# Reads the block file (begin line, rule body, end line), then the current text of
-# the target file. Writes the new text to stdout.
+# Reads the block file (begin line, the same begin line with the "added a final
+# newline" flag, rule body, end line), then the current text of the target file.
+# Writes the new text to stdout.
+#
+# Every line of the target keeps its own terminator: CRLF, LF, or none (only the last
+# line can lack one; endsnl says whether the text ends with LF). A lone CR is content.
+# Lines that the script adds end with nl: CRLF if the text has any CRLF, else LF.
+# When install has to give the last line a terminator, it uses the flagged begin
+# marker, so that uninstall can take the terminator away again.
 # Exit status: 0 ok, 3 damaged markers, 4 nothing to remove.
 FNR == NR {
     sub(/\r$/, "")
-    blk[++nb] = $0
+    nb++
+    if (nb == 1) {
+        begin_plain = $0
+    } else if (nb == 2) {
+        begin_flagged = $0
+    } else {
+        blk[nb - 2] = $0
+    }
     next
 }
 {
     rec[++n] = $0
 }
 END {
-    # One newline style for the whole file: CRLF if the text has any CRLF.
+    nblk = nb - 2
     crlf = 0
     for (i = 1; i <= n; i++) {
         if (i < n || endsnl == 1) {
@@ -261,19 +277,13 @@ END {
             if (sub(/\r$/, "", line)) {
                 crlf = 1
                 rec[i] = line
+                term[i] = "\r\n"
+            } else {
+                term[i] = "\n"
             }
+        } else {
+            term[i] = ""
         }
-    }
-    # A file with only white space counts as empty.
-    nonblank = 0
-    for (i = 1; i <= n; i++) {
-        if (rec[i] ~ /[^ \t\r\f]/) {
-            nonblank = 1
-            break
-        }
-    }
-    if (!nonblank) {
-        n = 0
     }
 
     nbeg = 0
@@ -291,6 +301,10 @@ END {
     }
 
     nl = crlf ? "\r\n" : "\n"
+    flagged = 0
+    if (nbeg == 1 && index(rec[bidx[1]], "; added a final newline)") > 0) {
+        flagged = 1
+    }
     if (remove == 1) {
         if (nbeg == 0) {
             exit 4
@@ -301,20 +315,38 @@ END {
         if (s > 1 && rec[s - 1] == "") {
             s--
         }
-        for (i = 1; i < s; i++) emit(rec[i])
-        for (i = e + 1; i <= n; i++) emit(rec[i])
+        # Install added a terminator to the last line: take it away again, but only
+        # if the block is still at the end (text after it must not merge with the line).
+        if (flagged && e == n && s > 1) {
+            term[s - 1] = ""
+        }
+        for (i = 1; i < s; i++) put(i)
+        for (i = e + 1; i <= n; i++) put(i)
     } else if (nbeg == 1) {
-        for (i = 1; i < bidx[1]; i++) emit(rec[i])
-        for (j = 1; j <= nb; j++) emit(blk[j])
-        for (i = eidx[1] + 1; i <= n; i++) emit(rec[i])
+        for (i = 1; i < bidx[1]; i++) put(i)
+        put_block()
+        for (i = eidx[1] + 1; i <= n; i++) put(i)
     } else {
-        for (i = 1; i <= n; i++) emit(rec[i])
-        if (n > 0) emit("")
-        for (j = 1; j <= nb; j++) emit(blk[j])
+        if (n > 0 && term[n] == "") {
+            # An added LF after a final CR would read back as CRLF; add CRLF so that the
+            # next run finds the same lines.
+            if (rec[n] ~ /\r$/) {
+                nl = "\r\n"
+            }
+            term[n] = nl
+            flagged = 1
+        }
+        for (i = 1; i <= n; i++) put(i)
+        if (n > 0) printf "%s", nl
+        put_block()
     }
 }
-function emit(s) {
-    printf "%s%s", s, nl
+function put(i) {
+    printf "%s%s", rec[i], term[i]
+}
+function put_block(   j) {
+    printf "%s%s", (flagged ? begin_flagged : begin_plain), nl
+    for (j = 1; j <= nblk; j++) printf "%s%s", blk[j], nl
 }
 AWK
 
@@ -345,15 +377,19 @@ update_block() {
     fi
   fi
 
+  # The first two lines are the begin marker without and with the flag that says
+  # "install gave the last line of the file a final newline".
   {
     printf '%s\n' "$begin_prefix v$version (managed by install script; run it again to change tiers) -->"
+    printf '%s\n' "$begin_prefix v$version (managed by install script; run it again to change tiers; added a final newline) -->"
     printf '%s\n' "$BODY"
     printf '%s\n' "$end_prefix -->"
   } >"$WORK/block"
 
   # BINMODE=3 keeps gawk under Git Bash and Cygwin from dropping the CR of CRLF line
-  # ends. Other awks treat it as an unused variable.
-  awk -v BINMODE=3 -v bp="$begin_prefix" -v ep="$end_prefix" -v remove="$remove" -v endsnl="$endsnl" \
+  # ends. Other awks treat it as an unused variable. LC_ALL=C makes awk read bytes, so
+  # that text in any encoding comes back unchanged.
+  LC_ALL=C awk -v BINMODE=3 -v bp="$begin_prefix" -v ep="$end_prefix" -v remove="$remove" -v endsnl="$endsnl" \
     -f "$WORK/edit.awk" "$WORK/block" "$WORK/old" >"$WORK/new" || awk_status=$?
   case $awk_status in
     0) ;;
@@ -373,7 +409,9 @@ update_block() {
   if [ "$existing" -eq 1 ]; then
     cp -f "$path" "$path.subagent-routing.bak"
   fi
-  if [ "$remove" -eq 1 ] && [ -z "$(tr -d '[:space:]' <"$WORK/new")" ]; then
+  # Zero bytes left: the file held only the block (or nothing else). A file that held
+  # only white space or only a BOM comes back as it was.
+  if [ "$remove" -eq 1 ] && [ ! -s "$WORK/new" ] && [ "$bom" -eq 0 ]; then
     if [ -L "$path" ]; then
       # Deleting a link would leave the block in the real file behind it. Empty that
       # file instead, so that the link stays and the block is gone.

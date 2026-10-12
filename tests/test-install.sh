@@ -243,6 +243,124 @@ if mode_is_600 "$H/.claude/CLAUDE.md"; then
   assert_true 'permissions kept' mode_is_600 "$H/.claude/CLAUDE.md"
 fi
 
+# 6d. Files that need care come back byte for byte: no final newline (also with CRLF),
+# a mix of CRLF and LF, white space only. When install has to add a final newline, the
+# begin marker says so ("; added a final newline)"), and uninstall takes it away again.
+flag_text='; added a final newline)'
+begin_line() { grep '^<!-- >>> subagent-routing' "$1" | head -n 1; }
+# starts_with_file <file> <prefix file>: the file begins with all the bytes of the prefix file.
+starts_with_file() {
+  local size
+  size=$(wc -c <"$2")
+  size=${size//[[:space:]]/}
+  head -c "$size" "$1" | cmp -s - "$2"
+}
+# bytes_hex <text>: the bytes of the text (printf escapes allowed) as one line of hex.
+bytes_hex() { printf '%b' "$1" | od -An -v -tx1 | tr -d ' \n'; }
+
+new_home
+mkdir "$H/.claude"
+claude_file=$H/.claude/CLAUDE.md
+printf 'mine' >"$claude_file"
+cp "$claude_file" "$H/mine.before"
+run_installer --claude --light haiku --standard sonnet --strong opus --home "$H"
+assert_true 'no final newline: flagged marker' contains "$(begin_line "$claude_file")" "$flag_text"
+assert_true 'no final newline: one blank line before the block' starts_with_hex "$claude_file" "$(bytes_hex 'mine\n\n<!-- >>> subagent-routing')"
+run_installer --claude --uninstall --home "$H"
+assert_true 'no final newline restored' same_bytes "$claude_file" "$H/mine.before"
+
+new_home
+mkdir "$H/.claude"
+claude_file=$H/.claude/CLAUDE.md
+printf 'a\r\nb' >"$claude_file"
+cp "$claude_file" "$H/crlf.before"
+run_installer --claude --home "$H"
+assert_true 'no final newline CRLF: flagged marker' contains "$(begin_line "$claude_file")" "$flag_text"
+assert_true 'no final newline CRLF: added lines use CRLF' starts_with_hex "$claude_file" "$(bytes_hex 'a\r\nb\r\n\r\n<!-- >>> subagent-routing')"
+run_installer --claude --uninstall --home "$H"
+assert_true 'no final newline CRLF restored' same_bytes "$claude_file" "$H/crlf.before"
+
+new_home
+mkdir "$H/.claude"
+claude_file=$H/.claude/CLAUDE.md
+printf 'a\r\nb\nc\r\n' >"$claude_file"
+cp "$claude_file" "$H/mixed.before"
+run_installer --claude --home "$H"
+assert_true 'mixed endings kept on install' starts_with_file "$claude_file" "$H/mixed.before"
+assert_false 'mixed endings: no flag when the file ended with a newline' contains "$(begin_line "$claude_file")" "$flag_text"
+run_installer --claude --uninstall --home "$H"
+assert_true 'mixed endings restored' same_bytes "$claude_file" "$H/mixed.before"
+
+# The flag stays when the block is replaced in place.
+new_home
+mkdir "$H/.claude"
+claude_file=$H/.claude/CLAUDE.md
+printf 'mine' >"$claude_file"
+cp "$claude_file" "$H/mine.before"
+run_installer --claude --light haiku --standard sonnet --strong opus --home "$H"
+run_installer --claude --light haiku --standard sonnet --strong 'claude-opus-5-5[effort=high]' --home "$H"
+assert_true 'flag kept on tier change: tier changed' contains "$(text_of "$claude_file")" '- Strong: `claude-opus-5-5[effort=high]`'
+assert_true 'flag kept on tier change' contains "$(begin_line "$claude_file")" "$flag_text"
+run_installer --claude --uninstall --home "$H"
+assert_true 'flag kept on tier change: uninstall restores' same_bytes "$claude_file" "$H/mine.before"
+
+# Text added after a flagged block keeps its line: the final newline of the line
+# before the block stays, so that the two lines do not merge.
+new_home
+mkdir "$H/.claude"
+claude_file=$H/.claude/CLAUDE.md
+printf 'mine' >"$claude_file"
+run_installer --claude --home "$H"
+printf 'after\n' >>"$claude_file"
+run_installer --claude --uninstall --home "$H"
+printf 'mine\nafter\n' >"$H/after.expected"
+assert_true 'text after block keeps newline' same_bytes "$claude_file" "$H/after.expected"
+
+# A file with only white space is a normal file: install keeps it, uninstall brings it back.
+new_home
+mkdir "$H/.claude"
+claude_file=$H/.claude/CLAUDE.md
+printf '\n' >"$claude_file"
+cp "$claude_file" "$H/blank.before"
+run_installer --claude --home "$H"
+assert_true 'whitespace-only file kept on install' starts_with_hex "$claude_file" "$(bytes_hex '\n\n<!-- >>> subagent-routing')"
+run_installer --claude --uninstall --home "$H"
+assert_true 'whitespace-only file restored' same_bytes "$claude_file" "$H/blank.before"
+assert_true 'whitespace-only file still exists' test -f "$claude_file"
+assert_true 'whitespace-only file reported as removed' contains "$OUT" "Claude Code: removed - $(shown "$claude_file")"
+
+# A last line that ends in a lone CR, a BOM file without a final newline, a file that
+# holds only a BOM, and text that is not UTF-8 also come back byte for byte.
+new_home
+mkdir "$H/.claude"
+claude_file=$H/.claude/CLAUDE.md
+printf 'a\r' >"$claude_file"
+cp "$claude_file" "$H/cr.before"
+run_installer --claude --home "$H"
+run_installer --claude --home "$H"
+assert_true 'lone CR: rerun up to date' contains "$OUT" 'already up to date'
+run_installer --claude --uninstall --home "$H"
+assert_true 'lone CR restored' same_bytes "$claude_file" "$H/cr.before"
+
+printf '\357\273\277mine' >"$claude_file"
+cp "$claude_file" "$H/bom.before"
+run_installer --claude --home "$H"
+run_installer --claude --uninstall --home "$H"
+assert_true 'BOM without final newline restored' same_bytes "$claude_file" "$H/bom.before"
+
+printf '\357\273\277' >"$claude_file"
+cp "$claude_file" "$H/bom-only.before"
+run_installer --claude --home "$H"
+run_installer --claude --uninstall --home "$H"
+assert_true 'BOM-only file restored' same_bytes "$claude_file" "$H/bom-only.before"
+
+printf 'caf\351\n' >"$claude_file"
+cp "$claude_file" "$H/latin1.before"
+run_installer --claude --home "$H"
+assert_true 'non-UTF-8 text kept on install' starts_with_file "$claude_file" "$H/latin1.before"
+run_installer --claude --uninstall --home "$H"
+assert_true 'non-UTF-8 text restored' same_bytes "$claude_file" "$H/latin1.before"
+
 # 7. A non-empty AGENTS.override.md receives the block instead of AGENTS.md.
 new_home
 mkdir "$H/.codex"

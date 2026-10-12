@@ -33,6 +33,7 @@ function Assert-True {
 
 function Read-Bytes { param([string]$Path) return [System.IO.File]::ReadAllBytes($Path) }
 function Read-Utf8 { param([string]$Path) return [System.IO.File]::ReadAllText($Path) }
+function Set-Utf8 { param([string]$Path, [string]$Text) [System.IO.File]::WriteAllText($Path, $Text, (New-Object System.Text.UTF8Encoding $false)) }
 function Get-BlockCount {
     param([string]$Text)
     return ([regex]::Matches($Text, '(?m)^<!-- >>> subagent-routing')).Count
@@ -107,6 +108,73 @@ Assert-True 'CRLF kept' (-not ($codexText -replace "`r`n", '').Contains("`n"))
 $r = Invoke-Installer -Arguments @('-Claude', '-Codex', '-Uninstall', '-HomePath', $h)
 Assert-True 'uninstall restores LF file' ([System.Linq.Enumerable]::SequenceEqual([byte[]](Read-Bytes $claudeFile), [byte[]]$claudeBefore))
 Assert-True 'uninstall restores CRLF BOM file' ([System.Linq.Enumerable]::SequenceEqual([byte[]](Read-Bytes $codexFile), [byte[]]$codexBefore))
+
+# 6c. A missing final newline, mixed endings, and a whitespace-only file come back byte for byte.
+$h = New-TempHome; $homes.Add($h)
+New-Item -ItemType Directory -Path (Join-Path $h '.claude') | Out-Null
+$claudeFile = Join-Path $h '.claude/CLAUDE.md'
+Set-Utf8 $claudeFile 'mine'
+$r = Invoke-Installer -Arguments @('-Claude', '-Strong', 'opus', '-HomePath', $h)
+$text = Read-Utf8 $claudeFile
+Assert-True 'no final newline: flagged marker' ($text.StartsWith("mine`n`n<!-- >>> subagent-routing", [System.StringComparison]::Ordinal) -and $text.Contains('; added a final newline)')) $r.Output
+$r = Invoke-Installer -Arguments @('-Claude', '-Strong', 'sonnet', '-HomePath', $h)
+$text = Read-Utf8 $claudeFile
+Assert-True 'flag kept on tier change' ($text.Contains('; added a final newline)') -and $text.Contains('- Strong: `sonnet`')) $r.Output
+$r = Invoke-Installer -Arguments @('-Claude', '-Uninstall', '-HomePath', $h)
+Assert-True 'no final newline restored' ((Read-Utf8 $claudeFile) -ceq 'mine') $r.Output
+
+Set-Utf8 $claudeFile 'mine'
+$r = Invoke-Installer -Arguments @('-Claude', '-HomePath', $h)
+[System.IO.File]::AppendAllText($claudeFile, "after`n")
+$r = Invoke-Installer -Arguments @('-Claude', '-Uninstall', '-HomePath', $h)
+Assert-True 'text after block keeps newline' ((Read-Utf8 $claudeFile) -ceq "mine`nafter`n") $r.Output
+
+Set-Utf8 $claudeFile "a`r`nb"
+$r = Invoke-Installer -Arguments @('-Claude', '-HomePath', $h)
+$r = Invoke-Installer -Arguments @('-Claude', '-Uninstall', '-HomePath', $h)
+Assert-True 'no final newline CRLF restored' ((Read-Utf8 $claudeFile) -ceq "a`r`nb") $r.Output
+
+$mixed = "a`r`nb`nc`r`n"
+Set-Utf8 $claudeFile $mixed
+$r = Invoke-Installer -Arguments @('-Claude', '-HomePath', $h)
+Assert-True 'mixed endings kept on install' ((Read-Utf8 $claudeFile).StartsWith($mixed, [System.StringComparison]::Ordinal)) $r.Output
+Assert-True 'mixed endings: no flag when the file ended with a newline' (-not (Read-Utf8 $claudeFile).Contains('; added a final newline)'))
+$r = Invoke-Installer -Arguments @('-Claude', '-Uninstall', '-HomePath', $h)
+Assert-True 'mixed endings restored' ((Read-Utf8 $claudeFile) -ceq $mixed) $r.Output
+
+Set-Utf8 $claudeFile "`n"
+$r = Invoke-Installer -Arguments @('-Claude', '-HomePath', $h)
+$r = Invoke-Installer -Arguments @('-Claude', '-Uninstall', '-HomePath', $h)
+Assert-True 'whitespace-only file restored' ((Test-Path $claudeFile) -and (Read-Utf8 $claudeFile) -ceq "`n") $r.Output
+
+# A last line that ends in a lone CR, a BOM file without a final newline, a file that
+# holds only a BOM, and text that is not UTF-8 also come back byte for byte.
+function Test-RoundTrip {
+    param([string]$Name, [byte[]]$Original)
+
+    [System.IO.File]::WriteAllBytes($claudeFile, $Original)
+    $r = Invoke-Installer -Arguments @('-Claude', '-HomePath', $h)
+    $r = Invoke-Installer -Arguments @('-Claude', '-Uninstall', '-HomePath', $h)
+    $after = [byte[]]@()
+    if (Test-Path $claudeFile) {
+        $after = [System.IO.File]::ReadAllBytes($claudeFile)
+    }
+    Assert-True $Name ([System.Linq.Enumerable]::SequenceEqual($after, $Original)) $r.Output
+}
+Set-Utf8 $claudeFile "a`r"
+$r = Invoke-Installer -Arguments @('-Claude', '-HomePath', $h)
+$r = Invoke-Installer -Arguments @('-Claude', '-HomePath', $h)
+Assert-True 'lone CR: rerun up to date' ($r.Output -match 'already up to date') $r.Output
+$r = Invoke-Installer -Arguments @('-Claude', '-Uninstall', '-HomePath', $h)
+Assert-True 'lone CR restored' ((Read-Utf8 $claudeFile) -ceq "a`r") $r.Output
+Test-RoundTrip 'BOM without final newline restored' ([byte[]](0xEF, 0xBB, 0xBF, 0x6D, 0x69, 0x6E, 0x65))
+Test-RoundTrip 'BOM-only file restored' ([byte[]](0xEF, 0xBB, 0xBF))
+$latin1Bytes = [byte[]](0x63, 0x61, 0x66, 0xE9, 0x0A)
+[System.IO.File]::WriteAllBytes($claudeFile, $latin1Bytes)
+$r = Invoke-Installer -Arguments @('-Claude', '-HomePath', $h)
+$installed = [System.IO.File]::ReadAllBytes($claudeFile)
+Assert-True 'non-UTF-8 text kept on install' ([System.Linq.Enumerable]::SequenceEqual([byte[]]$installed[0..4], $latin1Bytes)) $r.Output
+Test-RoundTrip 'non-UTF-8 text restored' $latin1Bytes
 
 # 7. A non-empty AGENTS.override.md receives the block instead of AGENTS.md.
 $h = New-TempHome; $homes.Add($h)

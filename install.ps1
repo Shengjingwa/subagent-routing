@@ -36,9 +36,13 @@ $ErrorActionPreference = 'Stop'
 
 $beginPrefix = '<!-- >>> subagent-routing'
 $endPrefix = '<!-- <<< subagent-routing'
+# Ends the begin marker when install had to add a final newline; uninstall removes it again.
+$finalNewlineNote = '; added a final newline)'
 $root = $PSScriptRoot
 $version = ([System.IO.File]::ReadAllText((Join-Path $root 'VERSION'))).Trim()
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+# Latin-1 maps each byte to one character and back, so that files in any encoding keep their bytes.
+$latin1 = [System.Text.Encoding]::GetEncoding(28591)
 
 function Write-Usage {
     Write-Host 'Usage: ./install.ps1 [-Cursor] [-Claude] [-Codex] [-Light <model>] [-Standard <model>] [-Strong <model>] [-Uninstall] [-NoClipboard]'
@@ -79,15 +83,18 @@ function Read-TextFile {
     if ($hasBom) {
         $offset = 3
     }
-    $text = (New-Object System.Text.UTF8Encoding $false).GetString($bytes, $offset, $bytes.Length - $offset)
+    $text = $latin1.GetString($bytes, $offset, $bytes.Length - $offset)
     return [pscustomobject]@{ Text = $text; HasBom = $hasBom }
 }
 
 function Write-TextFile {
     param([string]$Path, [string]$Text, [bool]$HasBom)
 
-    $encoding = New-Object System.Text.UTF8Encoding $HasBom
-    [System.IO.File]::WriteAllText($Path, $Text, $encoding)
+    $bytes = $latin1.GetBytes($Text)
+    if ($HasBom) {
+        $bytes = [byte[]](@(0xEF, 0xBB, 0xBF) + $bytes)
+    }
+    [System.IO.File]::WriteAllBytes($Path, $bytes)
 }
 
 function Update-ManagedBlock {
@@ -110,15 +117,27 @@ function Update-ManagedBlock {
         $newline = "`r`n"
     }
 
+    # Each line keeps its own ending ("`r`n", "`n", or '' for a last line without one),
+    # so that uninstall gives back files with mixed endings unchanged.
     $lines = New-Object System.Collections.Generic.List[string]
-    if ($text.Trim()) {
-        foreach ($line in ($text -split '\r?\n')) {
-            $lines.Add($line)
+    $endings = New-Object System.Collections.Generic.List[string]
+    $pos = 0
+    while ($pos -lt $text.Length) {
+        $lf = $text.IndexOf([char]10, $pos)
+        if ($lf -lt 0) {
+            $lines.Add($text.Substring($pos))
+            $endings.Add('')
+            break
         }
-        if ($text.EndsWith("`n", [System.StringComparison]::Ordinal)) {
-            # Splitting "a`nb`n" leaves an empty last element for the final newline.
-            $lines.RemoveAt($lines.Count - 1)
+        $contentEnd = $lf
+        $ending = "`n"
+        if ($lf -gt $pos -and $text[$lf - 1] -eq [char]13) {
+            $contentEnd = $lf - 1
+            $ending = "`r`n"
         }
+        $lines.Add($text.Substring($pos, $contentEnd - $pos))
+        $endings.Add($ending)
+        $pos = $lf + 1
     }
 
     $ordinal = [System.StringComparison]::Ordinal
@@ -132,6 +151,8 @@ function Update-ManagedBlock {
         if ($begins.Count -eq 0) {
             return 'not installed'
         }
+        $addedFinalNewline = $lines[$begins[0]].Contains($finalNewlineNote)
+        $atEnd = $ends[0] -eq $lines.Count - 1
         $start = $begins[0]
         $count = $ends[0] - $begins[0] + 1
         # Also remove the blank line that the installer put before the block.
@@ -140,27 +161,55 @@ function Update-ManagedBlock {
             $count++
         }
         $lines.RemoveRange($start, $count)
+        $endings.RemoveRange($start, $count)
+        # If text follows the block, keep the newline so that no lines merge.
+        if ($addedFinalNewline -and $atEnd -and $lines.Count -gt 0) {
+            $endings[$endings.Count - 1] = ''
+        }
     }
     else {
-        $blockLines = @("$beginPrefix v$version (managed by install script; run it again to change tiers) -->")
-        $blockLines += @($Body -split '\r?\n')
-        $blockLines += "$endPrefix -->"
+        $addedFinalNewline = $false
         if ($begins.Count -eq 1) {
-            $lines.RemoveRange($begins[0], $ends[0] - $begins[0] + 1)
+            $addedFinalNewline = $lines[$begins[0]].Contains($finalNewlineNote)
+        }
+        elseif ($lines.Count -gt 0 -and $endings[$endings.Count - 1] -eq '') {
+            $addedFinalNewline = $true
+            # An added LF after a final CR would read back as CRLF; add CRLF so that the
+            # next run finds the same lines.
+            if ($lines[$lines.Count - 1].EndsWith("`r", [System.StringComparison]::Ordinal)) {
+                $newline = "`r`n"
+            }
+        }
+        $note = $(if ($addedFinalNewline) { $finalNewlineNote } else { ')' })
+        $blockLines = @("$beginPrefix v$version (managed by install script; run it again to change tiers$note -->")
+        $blockLines += @($latin1.GetString($utf8NoBom.GetBytes($Body)) -split '\r?\n')
+        $blockLines += "$endPrefix -->"
+        $blockEndings = [string[]](@($newline) * $blockLines.Count)
+        if ($begins.Count -eq 1) {
+            $count = $ends[0] - $begins[0] + 1
+            $lines.RemoveRange($begins[0], $count)
+            $endings.RemoveRange($begins[0], $count)
             $lines.InsertRange($begins[0], [string[]]$blockLines)
+            $endings.InsertRange($begins[0], $blockEndings)
         }
         else {
             if ($lines.Count -gt 0) {
+                if ($addedFinalNewline) {
+                    $endings[$endings.Count - 1] = $newline
+                }
                 $lines.Add('')
+                $endings.Add($newline)
             }
             $lines.AddRange([string[]]$blockLines)
+            $endings.AddRange($blockEndings)
         }
     }
 
-    $newText = ''
-    if ($lines.Count -gt 0) {
-        $newText = ($lines -join $newline) + $newline
+    $builder = New-Object System.Text.StringBuilder
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        [void]$builder.Append($lines[$i]).Append($endings[$i])
     }
+    $newText = $builder.ToString()
     # -ceq: a case-only change to a model name is still a change.
     if ($existing -and $newText -ceq $text) {
         return 'already up to date'
@@ -169,7 +218,7 @@ function Update-ManagedBlock {
     if ($existing) {
         Copy-Item -LiteralPath $Path -Destination "$Path.subagent-routing.bak" -Force
     }
-    if ($Remove -and -not $newText.Trim()) {
+    if ($Remove -and $newText.Length -eq 0 -and -not $hasBom) {
         if ((Get-Item -LiteralPath $Path -Force).LinkType) {
             # Deleting would remove the link and leave the block in its target.
             Write-TextFile -Path $Path -Text '' -HasBom $false

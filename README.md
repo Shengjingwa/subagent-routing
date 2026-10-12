@@ -114,7 +114,7 @@ Run the install command with the uninstall option:
 
 The script removes only its own block and keeps the rest of the file. If the file held only that block, the script deletes the file and keeps the backup. If that file is a symbolic link, the script keeps the link and empties the file that it points to. For Codex, uninstall removes the block from both `AGENTS.md` and `AGENTS.override.md`.
 
-Uninstall gives back the original bytes, with two exceptions. A file that did not end with a newline now ends with one. A file that mixed LF and CRLF line endings now uses CRLF everywhere.
+Uninstall gives back the original bytes, including the line ending of each line, the BOM, and text in any encoding. If the file did not end with a newline, install adds one before the block and notes this in the begin marker. Uninstall then removes the newline at the end of the file again. If you added text after the block, that newline stays, so that no lines run together. An empty file that you install into is deleted on uninstall, like a file that held only the block.
 
 Cursor: delete the User Rule titled `subagent-routing` in Cursor Settings > Rules. The `-Cursor -Uninstall` option deletes `out/cursor-rule.md` and prints a reminder.
 
