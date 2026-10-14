@@ -451,6 +451,12 @@ assert_true 'out-of-order markers file unchanged' same_bytes "$damaged" "$H/dama
 
 # 10. Cursor output has the rule without markers.
 cursor_file=$root/out/cursor-rule.md
+# The clone's out/cursor-rule.md may hold the user's own rendered rule.
+cursor_backup=
+if [ -e "$cursor_file" ]; then
+  cursor_backup=$H/cursor-rule.before
+  cp -p "$cursor_file" "$cursor_backup"
+fi
 run_installer --cursor --no-clipboard --light claude-haiku-5-5 --home "$H"
 cursor_text=$(text_of "$cursor_file")
 assert_true 'cursor rule written' starts_with "$cursor_text" '# Subagent routing'
@@ -459,6 +465,9 @@ assert_true 'cursor rule has no markers' count_is "$cursor_file" 0
 assert_true 'cursor rule ends with one newline' ends_with_one_newline "$cursor_file"
 run_installer --cursor --uninstall --home "$H"
 assert_false 'cursor uninstall removes output' test -e "$cursor_file"
+if [ -n "$cursor_backup" ]; then
+  cp -p "$cursor_backup" "$cursor_file"
+fi
 
 echo "passed: $passed, failed: $failed"
 if [ "$failed" -gt 0 ]; then

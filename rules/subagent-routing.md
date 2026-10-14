@@ -1,15 +1,15 @@
 # Subagent routing
 
-Each time you dispatch a subagent (Cursor: `Task` tool; Claude Code: `Agent` tool; Codex: `spawn_agent`), pick its tier from the tier table below. A tier line can list one model or comma-separated models from different model families (for example, Claude and Gemini). If the chosen tier lists a model in your own model's family, set the subagent's model to that model and treat this as an explicit user request for it. If the chosen tier has no model in your family (or shows a placeholder in angle brackets), do not set a model, so that the subagent inherits its default model. If the user names a different model in the conversation, use that model for that dispatch.
+Each time you dispatch a subagent (Cursor: `Task` tool; Claude Code: `Agent` tool; Codex: `spawn_agent`), choose its model in two steps. First, pick the tier by task type (see below). Second, on that tier's line, look only at models of your own model family (for example, `claude-…`, `opus`, `sonnet`, and `haiku` are Claude; `gemini-…` is Gemini). If the line has a model of your family, set the subagent's model to it and treat this as an explicit user request for it. If the line has none, or shows a placeholder in angle brackets, do not set a model, so that the subagent inherits your model. Never take a model of another family from the tier table, even when it is the only model on the line. If the user names a model in a chat message (the tier table does not count), use that model for that dispatch, also when it is of another family. The only other case for another family is a running skill that asks for models of different vendors (see the details file).
 
 If you are a subagent yourself, skip the split announcement, the delegation of strong-tier work, and the review before delivery, and dispatch subagents only when your prompt asks you to. Still use the report format that your prompt asks for.
 
-Tier table (models appear only here; to change a model, change only these three lines):
+Tier table (models appear only here; to change a model, change only these three lines). A line can list one model or comma-separated models of different families:
 - Light: `{{LIGHT_MODEL}}`
 - Standard: `{{STANDARD_MODEL}}`
 - Strong: `{{STRONG_MODEL}}`
 
-If the strong tier lists a model in your family, that model is the strong-tier model; otherwise treat your own model as the strong-tier model. If any tier still shows a placeholder in angle brackets, remind the user once per session to fill in the table.
+Your strong-tier model is the model of your family on the Strong line. If that line has no model of your family, you are the strong-tier model. For example, if you run as Gemini and the Strong line lists only Claude models, you are the strong-tier model, and strong-tier subagents inherit your model. If any tier still shows a placeholder in angle brackets, remind the user once per session to fill in the table.
 
 Pick the tier by task type. When you are not sure between Light and Standard on read-only work or running commands, start with Light; when you are not sure between Standard and Strong on code changes, verification, or analysis, use Standard, and reserve Strong for open-ended design, hard root-cause diagnosis, and first-pass independent reviews:
 - Light: read-only lookups, routine code/git/log scouting, or running existing commands and scripts. Examples: locate files, symbols, settings, or citations in docs, scout code paths, `git log -S` / `blame`, or logs (including `explore`), pull facts from many files or repositories, look up product or tool documentation (such as `cursor-guide`), extract given facts from known web pages, or run an existing script, test, evaluation, or API/Git query and collect the output or error lines.

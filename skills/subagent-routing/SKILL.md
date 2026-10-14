@@ -61,7 +61,7 @@ For a role that is not in this table, pick the tier by task type as the rule say
 
 Some skills ask the user to pick a model strategy for a panel of reviewers or jurors. Apply the user's answer as priority 1, with these limits:
 
-- **Different models**: pick only models at standard tier or higher from the models you can dispatch: the strong and standard tiers, plus flagship models from other vendors at the same level. Use models from different vendors where you can. Do not use the light tier or variants whose name contains `fast`.
+- **Different models**: pick only models at standard tier or higher from the models you can dispatch: the strong and standard tiers, plus flagship models from other vendors at the same level. Use models from different vendors where you can. Do not use the light tier or variants whose name contains `fast`. Besides a model that the user names, this is the only case in which you set a model of another family than your own.
 - **The same model**: use the strong-tier model for your family if the table has one; otherwise let all roles inherit your own model.
 
 ## The tier table and the available models do not agree

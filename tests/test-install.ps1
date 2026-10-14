@@ -221,13 +221,18 @@ Assert-True 'damaged file unchanged' ([System.Linq.Enumerable]::SequenceEqual([b
 $outDir = Join-Path $root 'out'
 $outDirExisted = Test-Path -LiteralPath $outDir
 $outFile = Join-Path $outDir 'cursor-rule.md'
+# The clone's out\cursor-rule.md may hold the user's own rendered rule.
+$outBefore = if (Test-Path -LiteralPath $outFile) { [System.IO.File]::ReadAllBytes($outFile) } else { $null }
 $r = Invoke-Installer -Arguments @('-Cursor', '-NoClipboard', '-Light', 'claude-haiku-5-5', '-HomePath', $h)
 $cursorText = Read-Utf8 $outFile
 Assert-True 'cursor rule written' ($cursorText.StartsWith('# Subagent routing') -and $cursorText.Contains('- Light: `claude-haiku-5-5`'))
 Assert-True 'cursor rule has no markers' ((Get-BlockCount $cursorText) -eq 0)
 $r = Invoke-Installer -Arguments @('-Cursor', '-Uninstall', '-HomePath', $h)
 Assert-True 'cursor uninstall removes output' (-not (Test-Path $outFile))
-if (-not $outDirExisted) {
+if ($null -ne $outBefore) {
+    [System.IO.File]::WriteAllBytes($outFile, $outBefore)
+}
+elseif (-not $outDirExisted) {
     Remove-Item -LiteralPath $outDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 

@@ -11,7 +11,7 @@ The rule is always on: the agent reads it in every session. A second file holds 
 ## What the rule makes the agent do
 
 1. For a task that changes 2 or more files, say what it does itself, what it dispatches in parallel, and what goes to the background. Then begin the work.
-2. Pick the tier of each subagent from the tier table, by task type. A tier can list one model or comma-separated models from different model families (for example, Claude and Gemini). If the chosen tier lists a model in the main model's family, use it; otherwise let the subagent inherit the main model by default.
+2. Pick the tier of each subagent from the tier table, by task type. A tier can list one model or comma-separated models from different model families (for example, Claude and Gemini). If the chosen tier lists a model in the main model's family, use it; otherwise let the subagent inherit the main model by default. Never take a model of another family from the table; use one only when the user names it in a message, or when a running skill asks for models of different vendors.
 3. Send strong-tier work (design, diagnosis, review) to a strong-tier subagent when the table has a strong-tier model in the main model's family and the main model is weaker.
 4. Get one independent review (strong-tier when the table has one for the main model's family, or inherited otherwise) of a multi-file change or of a change that touches security, data, or a release. Do this before delivery.
 5. Ask each subagent for the conclusion first, then the evidence, then what it is not sure about. The full answer goes in the final message.
