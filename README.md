@@ -11,12 +11,12 @@ The rule is always on: the agent reads it in every session. A second file holds 
 ## What the rule makes the agent do
 
 1. For a task that changes 2 or more files, say what it does itself, what it dispatches in parallel, and what goes to the background. Then begin the work.
-2. Pick the model of each subagent from the tier table, by task type.
-3. Send strong-tier work (design, diagnosis, review) to a strong-tier subagent when the main model is weaker.
-4. Get one independent strong-tier review of a multi-file change or of a change that touches security, data, or a release. Do this before delivery.
+2. Pick the tier of each subagent from the tier table, by task type. A tier can list one model or comma-separated models from different model families (for example, Claude and Gemini). If the chosen tier lists a model in the main model's family, use it; otherwise let the subagent inherit the main model by default.
+3. Send strong-tier work (design, diagnosis, review) to a strong-tier subagent when the table has a strong-tier model in the main model's family and the main model is weaker.
+4. Get one independent review (strong-tier when the table has one for the main model's family, or inherited otherwise) of a multi-file change or of a change that touches security, data, or a release. Do this before delivery.
 5. Ask each subagent for the conclusion first, then the evidence, then what it is not sure about. The full answer goes in the final message.
 6. Check 1-2 key pieces of evidence before it uses a subagent's conclusion.
-7. Run a failed subagent again, one tier up.
+7. Run a failed subagent again: one tier up (inheriting the main model if the higher tier has no model for that family), or once with a fresh subagent at the same model if already at the top tier or already inheriting the main model.
 
 A subagent reads the rule too, if its agent loads the same instructions. The rule tells it to skip steps 1, 3, and 4, and to dispatch only when its prompt asks.
 
@@ -24,11 +24,11 @@ The tier table has three tiers:
 
 | Tier | Task type |
 |---|---|
-| Light | High-volume information gathering that needs no judgment |
-| Standard | Work that needs understanding but no design |
-| Strong | Design, root-cause diagnosis, code and security review |
+| Light | Read-only lookups, routine code/git/log scouting, or running existing commands and scripts |
+| Standard | Synthesis, rubric-based verification, MR follow-up, incremental re-reviews, and code changes where the design is already decided |
+| Strong | Open-ended design, hard root-cause diagnosis, and first-pass independent code, spec, and security review |
 
-If the agent is not sure which tier to use, it goes one tier up.
+When not sure between Light and Standard on read-only work or running commands, the agent starts with Light. When not sure between Standard and Strong on code changes, verification, or analysis, it uses Standard.
 
 ## Install
 

@@ -159,10 +159,10 @@ run_installer --claude --light haiku --standard sonnet --strong opus --home "$H"
 assert_true 'rerun up to date' matches "$OUT" 'already up to date'
 
 # 4. Changing a tier replaces the block in place.
-run_installer --claude --light haiku --standard sonnet --strong 'claude-opus-5-5[effort=high]' --home "$H"
+run_installer --claude --light 'haiku,gemini-3.8-flash-high' --standard sonnet --strong 'claude-opus-5-5[effort=high]' --home "$H"
 text=$(text_of "$claude_file")
 assert_true 'tier change keeps one block' count_is "$claude_file" 1
-assert_true 'tier change applied' contains "$text" '- Strong: `claude-opus-5-5[effort=high]`'
+assert_true 'tier change applied' contains_all "$text" '- Light: `haiku,gemini-3.8-flash-high`' '- Strong: `claude-opus-5-5[effort=high]`'
 assert_false 'old tier gone' contains "$text" '- Strong: `opus`'
 assert_true 'backup written' test -f "$claude_file.subagent-routing.bak"
 

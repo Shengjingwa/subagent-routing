@@ -39,10 +39,10 @@ These ids are examples. Use the ids that your Cursor accepts.
 | Standard | `claude-sonnet-5-5-xhigh` |
 | Strong | `claude-opus-5-5-xhigh` |
 
-A model id can carry parameters in square brackets, for example `claude-opus-5[effort=high]`. The script accepts this form. Put quotes around the id:
+A model id can carry parameters in square brackets, for example `claude-opus-5[effort=high]`. A tier can also list comma-separated models for different families, for example `claude-haiku-5-5-thinking-xhigh,gemini-3.8-flash-high`. The script accepts both forms. Put quotes around the value:
 
 ```powershell
-./install.ps1 -Cursor -Light claude-haiku-5-5-thinking-xhigh -Standard claude-sonnet-5-5-xhigh -Strong 'claude-opus-5[effort=high]'
+./install.ps1 -Cursor -Light 'claude-haiku-5-5-thinking-xhigh,gemini-3.8-flash-high' -Standard claude-sonnet-5-5-xhigh -Strong 'claude-opus-5[effort=high]'
 ```
 
 ## Caveats

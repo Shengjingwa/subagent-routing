@@ -71,10 +71,10 @@ $r = Invoke-Installer -Arguments @('-Claude', '-Light', 'haiku', '-Standard', 's
 Assert-True 'rerun up to date' ($r.Output -match 'already up to date') $r.Output
 
 # 4. Changing a tier replaces the block in place.
-$r = Invoke-Installer -Arguments @('-Claude', '-Light', 'haiku', '-Standard', 'sonnet', '-Strong', 'claude-opus-5-5[effort=high]', '-HomePath', $h)
+$r = Invoke-Installer -Arguments @('-Claude', '-Light', 'haiku,gemini-3.8-flash-high', '-Standard', 'sonnet', '-Strong', 'claude-opus-5-5[effort=high]', '-HomePath', $h)
 $text = Read-Utf8 $claudeFile
 Assert-True 'tier change keeps one block' ((Get-BlockCount $text) -eq 1)
-Assert-True 'tier change applied' ($text.Contains('- Strong: `claude-opus-5-5[effort=high]`') -and -not $text.Contains('- Strong: `opus`'))
+Assert-True 'tier change applied' ($text.Contains('- Light: `haiku,gemini-3.8-flash-high`') -and $text.Contains('- Strong: `claude-opus-5-5[effort=high]`') -and -not $text.Contains('- Strong: `opus`'))
 Assert-True 'backup written' (Test-Path "$claudeFile.subagent-routing.bak")
 $r = Invoke-Installer -Arguments @('-Claude', '-Light', 'haiku', '-Standard', 'sonnet', '-Strong', 'Opus', '-HomePath', $h)
 $r = Invoke-Installer -Arguments @('-Claude', '-Light', 'haiku', '-Standard', 'sonnet', '-Strong', 'opus', '-HomePath', $h)

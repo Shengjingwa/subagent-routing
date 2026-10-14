@@ -1,6 +1,6 @@
 ---
 name: subagent-routing
-description: Details for the subagent-routing rule - running a subagent again at a higher tier, conflicts with skills that dispatch subagents, and changes to the tier table. Read only when the subagent-routing rule points here.
+description: Details for the subagent-routing rule - running a subagent again when its result is not acceptable, conflicts with skills that dispatch subagents, and changes to the tier table. Read only when the subagent-routing rule points here.
 disable-model-invocation: true
 ---
 
@@ -12,7 +12,7 @@ This file adds to the subagent-routing rule. The tier table (which model each of
 
 The user can keep personal additions in `~/.subagent-routing.local.md` (on Windows: `%USERPROFILE%\.subagent-routing.local.md`). If that file exists, read it after this file. It can contain, for example, tiers for the roles of the user's own skills. If it disagrees with this file, the local file applies. A model that the user names in the conversation still applies first. The local file is read only together with this file, so it cannot change the always-on rule, for example the tier table.
 
-## Run again at a higher tier
+## Run a subagent again
 
 **Not acceptable**: one or more of these is true.
 
@@ -25,7 +25,7 @@ The user can keep personal additions in `~/.subagent-routing.local.md` (on Windo
 
 **What to do**:
 
-1. Run the task again one tier up: light goes to standard, standard goes to strong. Run each task again at most one time. If a strong-tier result is not acceptable, do not run it again; go to step 3.
+1. Run the task again one tier up: light goes to standard, standard goes to strong. Use the new tier's model for your model family, or omit the model if the new tier has no model in your family so that the subagent inherits your model. Run each task again at most one time. If the first run was already at the strong tier (or already inherited your model), run the task again at most one time with a fresh subagent at that same model; if the second result is also not acceptable, go to step 3.
 2. Give the new run three things: the original task, what was not acceptable, and the facts from the first result that you checked yourself. Do not give conclusions that you did not check, because they can mislead the new subagent.
 3. If the second result is also not acceptable, do the missing parts yourself where you can. For the parts you cannot do, tell the user what is not solved and where it stopped.
 
@@ -45,26 +45,28 @@ For a role that is not in this table, pick the tier by task type as the rule say
 
 | Role in a skill | Tier |
 |---|---|
-| Code review, spec review, security review, final review | Strong |
-| Read-only exploration: code paths, git history, logs | Standard |
-| Implementer that follows a fixed plan or a ticket that already says what to change | Standard |
+| First-pass code review, spec review, security review, final review | Strong |
+| Re-review of incremental fixes after an initial review | Standard |
+| Locate files, symbols, settings, or doc citations; routine read-only scouting of code paths, git history, or logs; look up tool or product docs (such as `cursor-guide`); run an existing command, script, or test and collect output or errors | Light |
+| Cross-module multi-step code analysis; grade items against a fixed rubric; fact-check a report against local files; follow MRs and fix routine pipeline/review issues | Standard |
+| Implementer that follows a fixed plan, a decided change (including running offline evaluations), or reviewer/user feedback | Standard |
 | Implementer that must make its own design decisions | Strong |
 | Merger with no conflicts | Standard |
 | Merger that must resolve conflicts | Strong |
 | Alternative designs, approaches for a fix, architecture walk-through | Strong |
-| Research and summaries | Standard |
-| Look up facts in the environment for an interview or planning skill | Light or standard, by task type |
+| Research and summaries; CI failure triage (`ci-investigator`); browser testing (`browser-use`) | Standard |
+| Look up facts in the environment for an interview or planning skill | Light (or standard when synthesis is needed) |
 
 ### Skills that ask for different models per role
 
 Some skills ask the user to pick a model strategy for a panel of reviewers or jurors. Apply the user's answer as priority 1, with these limits:
 
 - **Different models**: pick only models at standard tier or higher from the models you can dispatch: the strong and standard tiers, plus flagship models from other vendors at the same level. Use models from different vendors where you can. Do not use the light tier or variants whose name contains `fast`.
-- **The same model**: use the strong tier for all roles.
+- **The same model**: use the strong-tier model for your family if the table has one; otherwise let all roles inherit your own model.
 
 ## The tier table and the available models do not agree
 
-The available models are the models that your subagent tool accepts (for example, the model list in the tool description).
+The available models are the models that your subagent tool accepts (for example, the model list in the tool description). Check only the models in the tier table that belong to your own model's family.
 
 - **A tier's model is not available**: dispatch with the model of the next tier up. If the strong tier's model is not available, do not set a model, so that the subagent uses its default model. Tell the user which tier is missing and ask which model to use instead.
 - **A newer version of the same model family is available** (for example, the table says version 5 and version 6 is in the list): tell the user that you recommend the change, and continue to dispatch with the table. Change the table only after the user agrees.
