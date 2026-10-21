@@ -46,6 +46,18 @@ For this reason, the rule asks for one independent strong-tier review before the
 
 A strong-model subagent once put its full answer in a message that was not the final message. The parent receives only the final message, so that answer did not reach the parent. The rule now requires the full answer in the final message.
 
+## Why a named model covers only its own work
+
+A user who names a model usually names it for one piece of work, such as two independent drafts from two vendors. Agents carried the name over to later dispatches in the same chat. In one chat, a Gemini main agent sent a routine re-review to a Claude model that the user had named only for an earlier evaluation. So the rule applies a named model only to the work it was named for, and the other dispatches follow the tier table.
+
+## Why batch subagents write in chunks
+
+With at most 4 subagents for a batch, each subagent had about 80 items. One subagent tried to put all its results, about 230 KB, in one message. The connection to the model provider failed after 5 minutes, and none of the results were saved. When a subagent writes its results to a file about 20 items at a time, each message stays short, and a failed run keeps its finished items.
+
+## Why a failed subagent is continued, not restarted
+
+When a subagent stops on a provider or connection error, Cursor reports its Agent ID so that the agent can send a follow-up. Main agents started new subagents instead, and the new subagents did all the reading again. When the agent continues the same subagent, that work is kept. The ID must be complete: shortened IDs and made-up IDs failed with "Composer not found for resume".
+
 ## Why the parent checks the evidence
 
 A subagent can be wrong. One reviewer said that a logged field was wrong. The live data showed that the field was right.

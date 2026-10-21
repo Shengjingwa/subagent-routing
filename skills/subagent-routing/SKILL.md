@@ -14,6 +14,8 @@ The user can keep personal additions in `~/.subagent-routing.local.md` (on Windo
 
 ## Run a subagent again
 
+**Stopped on an error**: a subagent that stopped on a provider or connection error (Cursor reports `Provider Error` and an `Agent ID`) has not given a bad result yet. Continue it once with `resume` and that full 36-character ID, and ask it to save what it has to disk before it goes on. A shortened or made-up ID fails with `Composer not found for resume`; the file names under `agent-transcripts/<chat>/subagents/` are the full IDs. If the continued run also fails, or the subagent cannot be continued, treat the result as not acceptable.
+
 **Not acceptable**: one or more of these is true.
 
 - The result does not answer the question, or it leaves out an item that the prompt asked for.
@@ -26,14 +28,14 @@ The user can keep personal additions in `~/.subagent-routing.local.md` (on Windo
 **What to do**:
 
 1. Run the task again one tier up: light goes to standard, standard goes to strong. Use the new tier's model for your model family, or omit the model if the new tier has no model in your family so that the subagent inherits your model. Run each task again at most one time. If the first run was already at the strong tier (or already inherited your model), run the task again at most one time with a fresh subagent at that same model; if the second result is also not acceptable, go to step 3.
-2. Give the new run three things: the original task, what was not acceptable, and the facts from the first result that you checked yourself. Do not give conclusions that you did not check, because they can mislead the new subagent.
+2. Give the new run three things: the original task, what was not acceptable, and the facts from the first result that you checked yourself. Do not give conclusions that you did not check, because they can mislead the new subagent. For batch work, also name the items that the first run already wrote to disk, so that the new run does only the rest.
 3. If the second result is also not acceptable, do the missing parts yourself where you can. For the parts you cannot do, tell the user what is not solved and where it stopped.
 
 ## Conflicts with skills that dispatch subagents
 
 Model choice, from highest priority to lowest:
 
-1. A model that the user names in this session, including an answer that the user gives when a skill asks them. This applies only to that dispatch.
+1. A model that the user names for a piece of work, including an answer that the user gives when a skill asks them. It applies only to the dispatches for that work.
 2. The subagent-routing rule.
 3. Model instructions in the skill file, for example "inherit the parent model" or "use the same model for all roles".
 
