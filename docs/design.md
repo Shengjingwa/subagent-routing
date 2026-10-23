@@ -64,6 +64,14 @@ When a subagent stops on a provider or connection error, Cursor reports its Agen
 
 Continuing has a limit. In the 1,025-item chat, the main agent continued the subagent twice, then started a new one with the same task and continued that one too, and every run failed. In two other chats, subagents stopped on `resource_exhausted` after several follow-ups had filled their context. So the agent continues a subagent once. If it stops again, a new subagent gets a smaller share and the files that the first one wrote.
 
+A follow-up also fails when the subagent is still running, or when it belongs to another chat: a duplicated chat keeps the subagent IDs of the chat it was copied from. The details file says what to do in each case.
+
+## Why long subagents run in the background
+
+A main agent that waits for a subagent in the foreground keeps its own connection open for the whole wait. In one chat on 2026-10-23, that connection dropped 17 minutes into such a wait. After it reconnected, Cursor marked the subagent call as cancelled, and the main agent received no result. The subagent kept running and finished 33 seconds later, with a report of about 20,000 characters in its transcript. The main agent looked for that transcript in the wrong folder, then started a new subagent for the same task, which took another 8 minutes.
+
+A background subagent does not hold the main agent's connection, and the agent is told when it finishes. So the rule starts a subagent that may take longer than about 5 minutes in the background, even when the next step needs its result. Typical small tasks take 1-3 minutes, so quick lookups still run in the foreground. When a call still comes back cancelled or empty, the details file has the agent read the subagent's transcript before it runs anything again.
+
 ## Why the parent checks the evidence
 
 A subagent can be wrong. One reviewer said that a logged field was wrong. The live data showed that the field was right.

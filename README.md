@@ -17,6 +17,7 @@ The rule is always on: the agent reads it in every session. A second file holds 
 5. Ask each subagent for the conclusion first, then the evidence, then what it is not sure about. The full answer goes in the final message.
 6. Check 1-2 key pieces of evidence before it uses a subagent's conclusion.
 7. Continue a subagent that stopped on a provider or connection error once (in Cursor, with `resume` and its full Agent ID); if it stops again, give a new subagent a smaller share. Size batch work so that each subagent finishes in about 30 minutes. Run a failed subagent again: one tier up (inheriting the main model if the higher tier has no model for that family), or once with a fresh subagent at the same model if already at the top tier or already inheriting the main model.
+8. Start a subagent that may take longer than about 5 minutes in the background, even when the next step needs its result. If a subagent comes back cancelled or empty, read its transcript before running it again.
 
 A subagent reads the rule too, if its agent loads the same instructions. The rule tells it to skip steps 1 and 3, and to dispatch only when its prompt asks.
 

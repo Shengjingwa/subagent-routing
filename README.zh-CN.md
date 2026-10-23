@@ -17,6 +17,7 @@ subagent 是主 agent 为一项任务另外启动的 agent。它在全新的上�
 5. 要求 subagent 按顺序答：结论，证据，没把握的点。完整答案放在最后一条消息里。
 6. 采用 subagent 的结论前，先自己核对 1-2 处关键证据。
 7. subagent 因模型服务或连接错误中断时，接着续跑同一个 subagent 一次（Cursor 里用 `resume` 传完整的 Agent ID）；再中断就把剩下的活拆小，交给新的 subagent。批量任务按每个 subagent 约 30 分钟做完来分。subagent 的结果不合格时重跑一次：升一档重跑（更高一档没有同家族模型时继承主模型）；原本已是最高档或已继承主模型时，新开一个同模型 subagent 重跑一次。
+8. 预计要跑 5 分钟以上的 subagent 放到后台启动，即使下一步就要用它的结果。subagent 显示已取消或没有交回结果时，先读它的会话记录，再决定是否重跑。
 
 如果 subagent 也加载同一份指令，它也会读到这条规则。规则让 subagent 跳过第 1、3 条，只在 prompt 要求时才再派 subagent。
 
