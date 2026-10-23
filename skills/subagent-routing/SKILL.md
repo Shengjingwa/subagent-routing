@@ -28,7 +28,7 @@ The user can keep personal additions in `~/.subagent-routing.local.md` (on Windo
 **What to do**:
 
 1. Run the task again one tier up: light goes to standard, standard goes to strong. Use the new tier's model for your model family, or omit the model if the new tier has no model in your family so that the subagent inherits your model. Run each task again at most one time. If the first run was already at the strong tier (or already inherited your model), run the task again at most one time with a fresh subagent at that same model; if the second result is also not acceptable, go to step 3.
-2. Give the new run three things: the original task, what was not acceptable, and the facts from the first result that you checked yourself. Do not give conclusions that you did not check, because they can mislead the new subagent. For batch work, also name the items that the first run already wrote to disk, so that the new run does only the rest.
+2. Give the new run three things: the original task, what was not acceptable, and the facts from the first result that you checked yourself. Do not give conclusions that you did not check, because they can mislead the new subagent. For batch work, also name the items that the first run already wrote to disk, so that the new run does only the rest. If the first run stopped on an error, split the rest so that each new run finishes in about 30 minutes.
 3. If the second result is also not acceptable, do the missing parts yourself where you can. For the parts you cannot do, tell the user what is not solved and where it stopped.
 
 ## Conflicts with skills that dispatch subagents

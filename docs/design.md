@@ -54,9 +54,15 @@ A user who names a model usually names it for one piece of work, such as two ind
 
 With at most 4 subagents for a batch, each subagent had about 80 items. One subagent tried to put all its results, about 230 KB, in one message. The connection to the model provider failed after 5 minutes, and none of the results were saved. When a subagent writes its results to a file about 20 items at a time, each message stays short, and a failed run keeps its finished items.
 
-## Why a failed subagent is continued, not restarted
+## Why each subagent gets about 30 minutes of work
 
-When a subagent stops on a provider or connection error, Cursor reports its Agent ID so that the agent can send a follow-up. Main agents started new subagents instead, and the new subagents did all the reading again. When the agent continues the same subagent, that work is kept. The ID must be complete: shortened IDs and made-up IDs failed with "Composer not found for resume".
+Long runs failed much more often than short ones. From 2026-10-10 to 2026-10-23, 6 foreground Gemini subagents ran 30 minutes or longer, and 5 of them stopped on an error after 45-66 minutes. In one chat, a single subagent had to repair 1,025 items in one run; it failed 5 times and used about 4 hours without a result. Only 2 of 199 foreground Claude subagents ran longer than 30 minutes; both finished, the longer one after 44 minutes. When each share fits in about 30 minutes, a failed run loses little, and the next round starts from the files already written.
+
+## Why a failed subagent is continued once, not restarted
+
+When a subagent stops on a provider or connection error, Cursor reports its Agent ID so that the agent can send a follow-up. Main agents started new subagents instead, and the new subagents did all the reading again. When the agent continues the same subagent, that work is kept. The ID must be complete: shortened IDs and made-up IDs failed with "Composer not found for resume". One main agent had only an 8-character prefix of a reviewer's ID left in its context, so it started a fresh reviewer that had to read the whole change again; the transcript folder has the full IDs.
+
+Continuing has a limit. In the 1,025-item chat, the main agent continued the subagent twice, then started a new one with the same task and continued that one too, and every run failed. In two other chats, subagents stopped on `resource_exhausted` after several follow-ups had filled their context. So the agent continues a subagent once. If it stops again, a new subagent gets a smaller share and the files that the first one wrote.
 
 ## Why the parent checks the evidence
 

@@ -16,7 +16,7 @@ The rule is always on: the agent reads it in every session. A second file holds 
 4. Dispatch a review subagent only when the user or a running skill asks for one. Reviews run at the standard tier.
 5. Ask each subagent for the conclusion first, then the evidence, then what it is not sure about. The full answer goes in the final message.
 6. Check 1-2 key pieces of evidence before it uses a subagent's conclusion.
-7. Continue a subagent that stopped on a provider or connection error (in Cursor, with `resume` and its full Agent ID). Run a failed subagent again: one tier up (inheriting the main model if the higher tier has no model for that family), or once with a fresh subagent at the same model if already at the top tier or already inheriting the main model.
+7. Continue a subagent that stopped on a provider or connection error once (in Cursor, with `resume` and its full Agent ID); if it stops again, give a new subagent a smaller share. Size batch work so that each subagent finishes in about 30 minutes. Run a failed subagent again: one tier up (inheriting the main model if the higher tier has no model for that family), or once with a fresh subagent at the same model if already at the top tier or already inheriting the main model.
 
 A subagent reads the rule too, if its agent loads the same instructions. The rule tells it to skip steps 1 and 3, and to dispatch only when its prompt asks.
 
