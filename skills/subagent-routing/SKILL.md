@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Subagent routing: details
 
-This file adds to the subagent-routing rule. The tier table (which model each of light, standard, and strong uses) exists only in the rule. This file uses only the tier names. For tier choice, when to dispatch, splitting the work, review before delivery, and the report format, the rule applies.
+This file adds to the subagent-routing rule. The tier table (which model each of light, standard, and strong uses) exists only in the rule. This file uses only the tier names. For tier choice, when to dispatch, splitting the work, and the report format, the rule applies.
 
 ## Local additions
 
@@ -47,7 +47,7 @@ For a role that is not in this table, pick the tier by task type as the rule say
 
 | Role in a skill | Tier |
 |---|---|
-| First-pass code review, spec review, security review, final review | Strong |
+| First-pass code review, spec review, security review, final review | Standard |
 | Re-review of incremental fixes after an initial review | Standard |
 | Locate files, symbols, settings, or doc citations; routine read-only scouting of code paths, git history, or logs; look up tool or product docs (such as `cursor-guide`); run an existing command, script, or test and collect output or errors | Light |
 | Cross-module multi-step code analysis; grade items against a fixed rubric; fact-check a report against local files; follow MRs and fix routine pipeline/review issues | Standard |

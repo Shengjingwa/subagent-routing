@@ -33,14 +33,14 @@ For this reason, the rule tells the agent to do targeted lookups itself.
 - On small tasks, a cheaper model that was labelled faster was not faster end to end. It also gave the weakest answers.
 - On one task, a mid-tier model took the same time as the strong model. On another task, it was about 1.5 times faster.
 
-## Why a fresh context matters
+## Why reviews run only on request
 
 Independent reviews found real bugs that the author had missed:
 
 - A hook silently allowed every command, because its input started with a byte-order mark.
 - A maintenance script would crash on an empty configuration object.
 
-For this reason, the rule asks for one independent strong-tier review before the agent delivers a multi-file or risky change. The reviewer gets only the diff, the goal, and the acceptance criteria.
+An earlier version of the rule asked for one strong-tier review before every multi-file or risky delivery. In the author's projects, each merge request already gets a review before it merges, so the extra review repeated that work and added 7-12 minutes of a strong model to most deliveries. The rule now dispatches a review subagent only when the user or a running skill asks for one, and reviews run at the standard tier.
 
 ## Why the final message holds the full answer
 
